@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NTMS Azure Storage RA-GRS Replication Demo</title>
+
+    <style>
+        body {
+            margin: 0;
+            background: #0f172a;
+            font-family: Arial, sans-serif;
+            color: #e5e7eb;
+        }
+        header {
+            padding: 20px;
+            background: #111827;
+            border-bottom: 1px solid #1f2937;
+        }
+        .container { padding: 20px; }
+
+        button {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover { background: #1d4ed8; }
+
+        .banner {
+            margin-top: 10px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .banner.green { background:#064e3b; border:1px solid #10b981; color:#a7f3d0; }
+        .banner.yellow{ background:#78350f; border:1px solid #f59e0b; color:#fde68a; }
+        .banner.red   { background:#7f1d1d; border:1px solid #ef4444; color:#fecaca; }
+
+        .galleries {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .gallery-frame {
+            background:#020617;
+            border-radius:12px;
+            border:1px solid #1f2937;
+            padding:20px;
+            flex:1 1 46%;
+        }
+        .grid {
+            display:grid;
+            grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
+            gap:15px;
+        }
+        .card {
+            background:#0a0f1f;
+            border-radius:10px;
+            border:1px solid #1f2937;
+            text-align:center;
+            padding:10px;
+        }
+        .card-media {
+            width:100%;
+            height:140px;
+            object-fit:cover;
+            border-radius:8px;
+        }
+        .badge {
+            margin-top:6px;
+            padding:3px 8px;
+            border-radius:999px;
+            font-size:12px;
+            background:#064e3b;
+            border:1px solid #10b981;
+            color:#a7f3d0;
+            display:inline-block;
+        }
+    </style>
+
+    <script>
+        function classifyLag(lag) {
+            if (lag === null || lag === undefined) return "red";
+            if (lag <= 60) return "green";      // within 1 minute
+            if (lag <= 900) return "yellow";    // within 15 minutes SLA
+            return "red";
+        }
+
+        function updateLagBanner() {
+            fetch("/api/account-latency")
+                .then(resp => resp.json())
+                .then(data => {
+                    const banner = document.getElementById("lag-banner");
+                    if (!banner) return;
+
+                    banner.classList.remove("green","yellow","red");
+
+                    if (data.error) {
+                        banner.classList.add("red");
+                        banner.textContent = "RA-GRS replication lag: unknown (" + data.error + ")";
+                        return;
+                    }
+
+                    const lag = data.lag_seconds;
+                    const cls = classifyLag(lag);
+                    banner.classList.add(cls);
+                    banner.textContent =
+                        "Account RA-GRS replication lag (based on geoReplicationStats.lastSyncTime): "
+                        + lag + " seconds.";
+                })
+                .catch(() => {
+                    const banner = document.getElementById("lag-banner");
+                    if (!banner) return;
+                    banner.classList.remove("green","yellow","red");
+                    banner.classList.add("red");
+                    banner.textContent = "RA-GRS replication lag: error calling /api/account-latency";
+                });
+        }
+
+        // Poll every 2 seconds
+        setInterval(updateLagBanner, 2000);
+
+        function forceRefresh() {
+            updateLagBanner();
+        }
+
+        window.onload = updateLagBanner;
+    </script>
+</head>
+
+<body>
+<header>
+    <h1>NTMS Azure Storage RA-GRS Replication Demo</h1>
+    <p>
+        Account: <strong>{{ account_name }}</strong> |
+        Container: <strong>{{ container_name }}</strong>
+    </p>
+    <div id="lag-banner" class="banner yellow">
+        Loading RA-GRS replication lag…
+    </div>
+</header>
+
+<div class="container">
+
+    <!-- Upload -->
+    <div style="margin-bottom:20px;">
+        <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
+            <input type="file" name="file" required>
+            <button type="submit">Upload</button>
+            <button type="button" onclick="forceRefresh()">Force Refresh Lag</button>
+        </form>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, msg in messages %}
+          <div style="padding:10px;background:#14532d;color:#a7f3d0;border-radius:8px;margin-bottom:10px;">
+            {{ msg }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="galleries">
+
+        <!-- PRIMARY -->
+        <div class="gallery-frame">
+            <h2>Primary Storage</h2>
+            <p style="font-size:12px;color:#94a3b8;">
+                All uploads go here first.
+            </p>
+
+            {% if items %}
+            <div class="grid">
+                {% for item in items %}
+                <div class="card">
+                    {% set lower = item.name.lower() %}
+                    {% if lower.endswith('.mp4') %}
+                        <video class="card-media" controls>
+                            <source src="{{ item.primary_url }}" type="video/mp4">
+                        </video>
+                    {% elif lower.endswith('.jpg') or lower.endswith('.jpeg') or
+                              lower.endswith('.png') or lower.endswith('.gif') or
+                              lower.endswith('.webp') %}
+                        <img class="card-media" src="{{ item.primary_url }}">
+                    {% else %}
+                        <a href="{{ item.primary_url }}" target="_blank"
+                           style="color:#60a5fa;font-size:13px;">
+                            Download {{ item.name }}
+                        </a>
+                    {% endif %}
+                    <div class="badge">Written to Primary</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+                <p>No files in primary yet. Upload something to start the demo.</p>
+            {% endif %}
+        </div>
+
+        <!-- SECONDARY -->
+        <div class="gallery-frame">
+            <h2>Secondary Storage (RA-GRS read-only)</h2>
+            <p style="font-size:12px;color:#94a3b8;">
+                Content is served from <code>{{ account_name }}-secondary.blob.core.windows.net</code>.
+                Replication is asynchronous, so very recent uploads may 404 here until replicated.
+            </p>
+
+            {% if items %}
+            <div class="grid">
+                {% for item in items %}
+                <div class="card">
+                    {% set lower = item.name.lower() %}
+                    {% if lower.endswith('.mp4') %}
+                        <video class="card-media" controls>
+                            <source src="{{ item.secondary_url }}" type="video/mp4">
+                        </video>
+                    {% elif lower.endswith('.jpg') or lower.endswith('.jpeg') or
+                              lower.endswith('.png') or lower.endswith('.gif') or
+                              lower.endswith('.webp') %}
+                        <img class="card-media" src="{{ item.secondary_url }}">
+                    {% else %}
+                        <a href="{{ item.secondary_url }}" target="_blank"
+                           style="color:#60a5fa;font-size:13px;">
+                            Download {{ item.name }} (secondary)
+                        </a>
+                    {% endif %}
+                    <div class="badge">Read from Secondary</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+                <p>No files yet — upload to primary and wait for replication.</p>
+            {% endif %}
+        </div>
+
+    </div>
+
+    <p style="margin-top:30px;font-size:12px;color:#64748b;">
+        NTMS Azure storage replication Demo behavior: Upload a file. It appears instantly in the Primary gallery.
+        The Secondary gallery serves the same blob via the <code>-secondary</code> endpoint.
+        The banner at the top shows the real account-level RA-GRS replication lag computed from
+        <code>geoReplicationStats.lastSyncTime</code>.
+    </p>
+
+</div>
+</body>
+</html>
+
