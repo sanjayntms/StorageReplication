@@ -16,4 +16,5 @@
 * export AZURE_STORAGE_CONTAINER_NAME="media"
 * export FLASK_SECRET_KEY="something-secret"
 * export AZURE_RESOURCE_GROUP="Linux-RG"
-# Create RAGRS storage account and update the above value.
+# Create RAGRS storage account and update the above value. 
+# Enable managed Identity on Linux VM and assign RBAC reader role.
