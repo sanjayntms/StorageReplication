@@ -1,5 +1,5 @@
 # StorageReplication
-** On Linux VM, open port 3000, run
+  ## On Linux VM, open port 3000, run
   sudo apt update
   sudo apt install python3-pip
   sudo apt update
