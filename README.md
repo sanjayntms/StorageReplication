@@ -15,4 +15,5 @@
 * export AZURE_STORAGE_ACCOUNT_KEY="h4VSPgMtElJ/DGw/vBdd9qxo+AsUU2Xd2BLNnXahioRbzaSMhXbg5s9D5XIgGbyzQgbrEC6r2x81+ASt9fk3EA=="
 * export AZURE_STORAGE_CONTAINER_NAME="media"
 * export FLASK_SECRET_KEY="something-secret"
+* export AZURE_RESOURCE_GROUP="Linux-RG"
 # Create RAGRS storage account and update the above value.
